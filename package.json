@@ -5,7 +5,9 @@
   "main": "gateway.js",
   "scripts": {
     "test": "cd Sentinel/server && npm test",
-    "start": "node gateway.js"
+    "start": "node gateway.js",
+    "build": "cd Sentinel/client && npm run build",
+    "dev": "concurrently \"npm start\" \"cd Sentinel/client && npm run dev\""
   },
   "keywords": [],
   "author": "",
