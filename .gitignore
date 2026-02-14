@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Local/System files
+.DS_Store
+.env
+*.log
+
+# Testing
+tests.json
+coverage/
+
+# Build outputs
+dist/
+build/
+review_v0.md
+
+# Agent Docs
+sentinel_prd.md

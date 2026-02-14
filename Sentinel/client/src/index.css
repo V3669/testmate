@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f172a;
+  /* Slate 900 - Deep Space */
+  --foreground: #f8fafc;
+  /* Slate 50 */
+  --primary: #3b82f6;
+  /* Blue 500 */
+  --secondary: #64748b;
+  /* Slate 500 */
+  --accent: #8b5cf6;
+  /* Violet 500 */
+  --success: #22c55e;
+  /* Green 500 */
+  --error: #ef4444;
+  /* Red 500 */
+  --warning: #eab308;
+  /* Yellow 500 */
+  --card: #1e293b;
+  /* Slate 800 */
+  --border: #334155;
+  /* Slate 700 */
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/10;
+  }
+}
