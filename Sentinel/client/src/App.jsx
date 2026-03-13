@@ -130,12 +130,20 @@ function App() {
             <History size={12} /> Recent Tests
           </div>
           <div className="space-y-1 max-h-32 overflow-y-auto">
-            {testHistory.slice(0, 5).map((test, i) => (
+            {testHistory.slice(0, 10).map((test, i) => (
               <div key={i} className="flex items-center justify-between text-xs">
-                <span className="truncate max-w-32">{test.id}</span>
-                <span className={test.status === 'passed' ? 'text-success' : 'text-error'}>
-                  {test.status === 'passed' ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                </span>
+                <div className="flex flex-col truncate max-w-40">
+                  <span className="truncate font-medium">{test.id}</span>
+                  <span className="text-[10px] text-secondary truncate">
+                    {test.project || 'unknown'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {test.type === 'stress' && <Zap size={10} className="text-warning" />}
+                  <span className={test.status === 'passed' ? 'text-success' : 'text-error'}>
+                    {test.status === 'passed' ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                  </span>
+                </div>
               </div>
             ))}
             {testHistory.length === 0 && (
