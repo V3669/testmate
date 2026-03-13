@@ -107,13 +107,45 @@ async function setup(mcp, app, options = {}) {
 }
 
 function registerMCPTools(mcp, service) {
+    // Helper to find tests.json in common project locations
+    const findProjectConfig = () => {
+        const fs = require('fs');
+        const home = process.env.HOME || process.env.USERPROFILE;
+        const pwd = process.env.PWD || process.cwd();
+        
+        // Search paths in order of priority
+        const searchPaths = [
+            // Current working directory from environment (IDE's CWD)
+            path.resolve(pwd, 'tests.json'),
+            // Current process CWD
+            path.resolve(process.cwd(), 'tests.json'),
+            // Home directory projects
+            path.resolve(home, 'projects', 'tests.json'),
+            // Common project locations
+            path.resolve(home, 'Desktop', 'lexicon', 'tests.json'),
+            path.resolve(home, 'workspace', 'tests.json'),
+            path.resolve(home, 'code', 'tests.json'),
+            // Parent directory (in case we're in a subfolder)
+            path.resolve(pwd, '..', 'tests.json'),
+            path.resolve(process.cwd(), '..', 'tests.json'),
+        ];
+        
+        for (const p of searchPaths) {
+            if (fs.existsSync(p)) {
+                return p;
+            }
+        }
+        return null;
+    };
+
     // Unified run_tests tool
     mcp.tool(
         "run_tests",
         `Run functional or stress tests from tests.json.
-         - Auto-discovers tests.json in current working directory (where IDE is running)
+         - Auto-discovers tests.json in your project directory
          - Returns rich results with summary and recommendations
-         - Use type='functional' for API tests, type='stress' for load tests`,
+         - Use type='functional' for API tests, type='stress' for load tests
+         - IMPORTANT: Use workingDirectory or configPath to specify your project`,
         { 
             type: { 
                 type: "string", 
@@ -126,36 +158,67 @@ function registerMCPTools(mcp, service) {
             },
             configPath: { 
                 type: "string", 
-                description: "Path to custom tests.json file" 
+                description: "Full path to tests.json file" 
             },
             workingDirectory: {
                 type: "string",
-                description: "Working directory to run tests from (defaults to current working directory)"
+                description: "Path to your project directory (where tests.json is)"
+            },
+            projectPath: {
+                type: "string", 
+                description: "Alias for workingDirectory - path to your project"
             }
         },
-        async ({ type = "functional", scenarioId, configPath, workingDirectory }) => {
+        async ({ type = "functional", scenarioId, configPath, workingDirectory, projectPath }) => {
             try {
-                // Determine config path - priority: explicit > workingDirectory > CWD
                 const fs = require('fs');
-                let finalPath = configPath;
                 
-                if (!finalPath && workingDirectory) {
-                    finalPath = path.resolve(workingDirectory, 'tests.json');
+                // Use provided path or find in project
+                let finalPath = configPath;
+                const targetDir = workingDirectory || projectPath;
+                
+                if (!finalPath && targetDir) {
+                    finalPath = path.resolve(targetDir, 'tests.json');
                 }
                 
                 if (!finalPath) {
-                    // Try current working directory first
-                    finalPath = path.resolve(process.cwd(), 'tests.json');
-                    if (!fs.existsSync(finalPath)) {
-                        // Try the original config path from service
-                        finalPath = service.getConfigPath();
-                    }
+                    // Try to find tests.json automatically
+                    finalPath = findProjectConfig();
                 }
                 
-                if (finalPath && fs.existsSync(finalPath) && finalPath !== service.getConfigPath()) {
-                    console.log(`[Testmate] Loading config from: ${finalPath}`);
-                    service.configLoader.configPath = finalPath;
-                    service.configLoader.load();
+                // Debug info
+                console.log(`[Testmate] CWD: ${process.cwd()}`);
+                console.log(`[Testmate] PWD: ${process.env.PWD}`);
+                console.log(`[Testmate] Config path: ${finalPath}`);
+                
+                if (finalPath && fs.existsSync(finalPath)) {
+                    if (finalPath !== service.getConfigPath()) {
+                        console.log(`[Testmate] Loading: ${finalPath}`);
+                        service.configLoader.configPath = finalPath;
+                        service.configLoader.load();
+                    }
+                } else {
+                    // Provide detailed help
+                    const possiblePaths = [
+                        path.resolve(process.cwd() || '', 'tests.json'),
+                        path.resolve(process.env.PWD || '', 'tests.json'),
+                        path.resolve(process.env.HOME || '', 'Desktop', 'lexicon', 'tests.json'),
+                    ].filter(p => fs.existsSync(p));
+                    
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `❌ tests.json not found!\n\n` +
+                                  `Current directory: ${process.cwd()}\n` +
+                                  `Environment PWD: ${process.env.PWD}\n\n` +
+                                  `Please specify your project:\n` +
+                                  `  run_tests({ workingDirectory: "/path/to/your/project" })\n` +
+                                  `  run_tests({ configPath: "/path/to/tests.json" })\n\n` +
+                                  `Example for your lexicon project:\n` +
+                                  `  run_tests({ workingDirectory: "/Users/vigi/Desktop/lexicon" })\n\n` +
+                                  `Or create tests.json in: ${process.cwd()}`
+                        }]
+                    };
                 }
                 
                 const results = await service.runTests({ type, scenarioId });
@@ -311,18 +374,32 @@ function registerMCPTools(mcp, service) {
     
     mcp.tool(
         "get_config_info",
-        "Get current configuration details and status.",
+        "Get current configuration details and status. Use this to debug config issues.",
         {},
         async () => {
             const config = service.getConfig();
             const configPath = service.getConfigPath();
             const error = service.getLastError();
+            const fs = require('fs');
             
-            if (error) {
+            // Check for tests.json in common locations
+            const cwdPath = path.resolve(process.cwd(), 'tests.json');
+            const cwdExists = fs.existsSync(cwdPath);
+            
+            if (error || !config) {
                 return {
                     content: [{
                         type: "text",
-                        text: `❌ No config loaded\n\nError: ${error}\n\nExpected config at: ${configPath}\n\nExample tests.json:\n\`\`\`json\n{\n  "config": { "baseUrl": "http://localhost:3000" },\n  "scenarios": [\n    { "id": "test1", "type": "functional", "method": "GET", "endpoint": "/health" }\n  ]\n}\n\`\`\``
+                        text: `❌ No config loaded\n\n` +
+                              `Current working directory: ${process.cwd()}\n` +
+                              `Config path: ${configPath}\n` +
+                              `Error: ${error || 'Unknown'}\n\n` +
+                              `tests.json in CWD: ${cwdExists ? '✅ Found' : '❌ Not found'}\n` +
+                              `${cwdExists ? `At: ${cwdPath}` : ''}\n\n` +
+                              `📌 To test your project, use:\n` +
+                              `  run_tests({ workingDirectory: "/path/to/project" })\n` +
+                              `  run_tests({ configPath: "/path/to/tests.json" })\n\n` +
+                              `Example:\nrun_tests({ type: "functional", workingDirectory: "/Users/vigi/Desktop/lexicon" })`
                     }]
                 };
             }
@@ -330,7 +407,12 @@ function registerMCPTools(mcp, service) {
             return {
                 content: [{
                     type: "text",
-                    text: `✅ Config loaded\n📁 Path: ${configPath}\n🌐 Base URL: ${config?.config?.baseUrl}\n⏱️ Timeout: ${config?.config?.timeout}ms\n\nScenarios (${config?.scenarios?.length}):\n${config?.scenarios?.map(s => `  - ${s.id} (${s.type}): ${s.method} ${s.endpoint}`).join('\n')}`
+                    text: `✅ Config loaded\n` +
+                          `📁 Path: ${configPath}\n` +
+                          `🌐 Base URL: ${config?.config?.baseUrl}\n` +
+                          `⏱️ Timeout: ${config?.config?.timeout}ms\n\n` +
+                          `Scenarios (${config?.scenarios?.length}):\n` +
+                          `${config?.scenarios?.map(s => `  - ${s.id} (${s.type}): ${s.method} ${s.endpoint}`).join('\n')}`
                 }]
             };
         }
