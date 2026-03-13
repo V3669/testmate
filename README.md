@@ -1,10 +1,17 @@
 # Testmate
 
-A personal development workflow assistant I'm building to streamline the entire development-to-testing process right from the IDE.
+A personal development workflow assistant that streamlines the entire development-to-testing process right from your IDE.
 
-Testmate acts as a central hub that combines multiple tools to make development and testing seamless, with your IDE becoming the one-stop shop for everything.
+## Features
 
-## Quick start
+- **AI-Powered Testing**: Generate and run test cases directly from your IDE using AI agents
+- **Functional Testing**: Test your API logic with detailed assertions and diff views
+- **Stress Testing**: Load test your endpoints with configurable concurrency and duration
+- **Real-time Metrics**: View p50, p95, p99 latency metrics and throughput stats
+- **MCP Integration**: Connect with Cursor, Windsurf, Anti-Gravity, or any MCP-compatible IDE
+- **Hot Reload**: Tests auto-run when you update your test configuration
+
+## Quick Start
 
 ```bash
 # Install dependencies
@@ -14,45 +21,144 @@ npm install
 npm start
 ```
 
-The server will start running on `http://localhost:3000`.
+Server runs at **http://localhost:3000**
 
-## Components
+## MCP Setup
 
-### Sentinel - Testing from your IDE
+### For Cursor/Windsurf/VSCode
 
-Sentinel is the testing component of Testmate that lets you create and run tests without leaving your IDE. Using AI agents directly in your editor, you can:
+Add to your MCP config (usually `~/.cursor/mcp.json` or project `.mcp.json`):
 
-- Generate test cases automatically based on your code
-- Run functional and stress tests
-- Get real-time feedback on test results
-- Manage test suites through a web interface
+```json
+{
+  "mcpServers": {
+    "testmate": {
+      "command": "node",
+      "args": ["/path/to/testmate/gateway.js"]
+    }
+  }
+}
+```
 
-Sentinel makes testing feel like a natural part of coding rather than a separate chore.
+### Available MCP Tools
 
-### Mock Service (Coming Next)
+| Tool | Description |
+|------|-------------|
+| `run_functional_tests` | Run functional tests from tests.json |
+| `run_stress_simulation` | Run stress test on a specific scenario |
+| `get_test_results` | Get latest test results with metrics |
 
-I'm working on a mock data service that will help developers test various scenarios by mocking external dependencies and APIs. This will be another MCP tool that:
+## Configuration
 
-- Mocks API responses for different scenarios
-- Simulates external service failures
-- Provides realistic test data
-- Works seamlessly with your local development environment
+Edit `tests.json` to define your test scenarios:
 
-## Project structure
+```json
+{
+  "config": {
+    "baseUrl": "http://localhost:8080",
+    "globalHeaders": { "Authorization": "Bearer {{env.API_KEY}}" },
+    "timeout": 5000
+  },
+  "scenarios": [
+    {
+      "id": "health_check",
+      "type": "functional",
+      "method": "GET",
+      "endpoint": "/health",
+      "expect": {
+        "status": 200,
+        "bodyPartial": { "status": "ok" }
+      }
+    },
+    {
+      "id": "stress_users",
+      "type": "stress",
+      "targetScenarioId": "create_user",
+      "parameters": {
+        "connections": 50,
+        "duration": "10s",
+        "pipelining": 1
+      },
+      "thresholds": {
+        "p95": 200,
+        "errors": 0.01
+      }
+    }
+  ]
+}
+```
 
-- `gateway.js` - Main server entry point
-- `Sentinel/` - Testing plugin for code verification
-- `package.json` - Dependencies and scripts
+### Environment Variables
+
+Use `{{env.VAR_NAME}}` in your config for environment variables:
+
+```json
+{
+  "config": {
+    "baseUrl": "{{env.API_URL}}",
+    "globalHeaders": {
+      "Authorization": "Bearer {{env.API_KEY}}"
+    }
+  },
+  "env": {
+    "API_URL": "http://localhost:3000",
+    "API_KEY": "your-key-here"
+  }
+}
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start web server (http://localhost:3000) |
+| `npm run mcp` | Start MCP gateway for IDE integration |
+| `npm run dev` | Run both server and client in dev mode |
+| `npm test` | Run all tests |
+| `npm run build` | Build the client |
+
+## Project Structure
+
+```
+testmate/
+├── gateway.js           # MCP server entry point
+├── web-server.js       # HTTP server entry point
+├── tests.json          # Test configuration
+├── package.json        # Root dependencies
+├── Sentinel/
+│   ├── client/         # React UI dashboard
+│   │   ├── src/
+│   │   └── dist/      # Built static files
+│   └── server/        # Core testing engine
+│       ├── SentinelService.js
+│       ├── functionalRunner.js
+│       ├── stressRunner.js
+│       ├── configLoader.js
+│       └── tests/
+└── README.md
+```
 
 ## Testing
 
-Run tests with:
+Run all tests:
 ```bash
 npm test
 ```
 
-## Dependencies
+Run with coverage:
+```bash
+npm run test:coverage
+```
 
-- Fastify - Web server framework
-- MCP SDK - Model Context Protocol integration
-- WebSocket support for real-time communication
+## Tech Stack
+
+- **Fastify** - Web server framework
+- **MCP SDK** - Model Context Protocol
+- **React** - UI dashboard
+- **Autocannon** - Load testing
+- **Jest** - Testing framework
+- **WebSocket** - Real-time updates
+
+## License
+
+ISC
