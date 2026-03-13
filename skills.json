@@ -1,0 +1,9 @@
+{
+  "skills": [
+    {
+      "name": "testmate",
+      "description": "AI-powered API testing framework for functional and stress tests. Use for: generate tests, run API tests, load test endpoints, check API performance metrics, test against localhost APIs, verify API responses, measure p50/p95/p99 latency, health checks, integration tests.",
+      "url": "https://raw.githubusercontent.com/V3669/testmate/main/SKILL.md"
+    }
+  ]
+}
