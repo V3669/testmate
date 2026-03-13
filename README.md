@@ -117,6 +117,25 @@ Use `{{env.VAR_NAME}}` in your config for environment variables:
 | `npm test` | Run all tests |
 | `npm run build` | Build the client |
 
+## AI Agent Integration (SKILL.md)
+
+This project includes a `SKILL.md` file that can be used by AI coding assistants (like Claude Code, Cursor, Windsurf) to understand how to use Testmate for testing.
+
+### Using with AI Agents
+
+The SKILL.md provides:
+- All available MCP tools and parameters
+- Configuration examples
+- Usage prompts for common tasks
+- Environment variable setup
+- Stress test parameters and thresholds
+
+AI agents can read `SKILL.md` to automatically understand how to:
+- Generate and run tests
+- Configure test scenarios
+- Interpret test results
+- Run stress tests with specific parameters
+
 ## Project Structure
 
 ```
