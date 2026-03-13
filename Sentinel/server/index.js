@@ -96,31 +96,109 @@ async function setup(mcp, app, options = {}) {
 }
 
 function registerMCPTools(mcp, service) {
+    // Unified run_tests tool
+    mcp.tool(
+        "run_tests",
+        `Run functional or stress tests from tests.json.
+         - Auto-discovers tests.json in current working directory
+         - Returns rich results with summary and recommendations
+         - Use type='functional' for API tests, type='stress' for load tests`,
+        { 
+            type: { 
+                type: "string", 
+                enum: ["functional", "stress", "all"],
+                description: "Type of tests to run: functional, stress, or all" 
+            },
+            scenarioId: { 
+                type: "string", 
+                description: "Specific test scenario ID to run (optional)" 
+            },
+            configPath: { 
+                type: "string", 
+                description: "Path to custom tests.json file (optional, defaults to CWD/tests.json)" 
+            },
+            workingDirectory: {
+                type: "string",
+                description: "Working directory to run tests from (optional)"
+            }
+        },
+        async ({ type = "functional", scenarioId, configPath, workingDirectory }) => {
+            try {
+                // Update config path if provided
+                if (configPath) {
+                    service.configLoader.configPath = configPath;
+                    service.configLoader.load();
+                } else if (workingDirectory) {
+                    service.configLoader.configPath = path.resolve(workingDirectory, 'tests.json');
+                    service.configLoader.load();
+                }
+                
+                const results = await service.runTests({ type, scenarioId });
+                
+                // Format rich response
+                let text = "";
+                
+                if (results.error) {
+                    text = `❌ Error: ${results.error.message || results.error}\n\n`;
+                    if (results.error.suggestion) {
+                        text += `💡 Suggestion: ${results.error.suggestion}\n\n`;
+                    }
+                    if (results.error.example) {
+                        text += `Example tests.json:\n\`\`\`json\n${JSON.stringify(results.error.example, null, 2)}\n\`\`\``;
+                    }
+                    return { content: [{ type: "text", text }] };
+                }
+                
+                if (results.summary) {
+                    const { total, passed, failed, baseUrl } = results.summary;
+                    const emoji = failed === 0 ? "✅" : "❌";
+                    text = `${emoji} Test Results: ${passed}/${total} passed\n`;
+                    text += `📁 Config: ${service.getConfigPath()}\n`;
+                    text += `🌐 Testing: ${baseUrl}\n\n`;
+                    
+                    if (failed > 0) {
+                        text += `⚠️ Failed tests:\n`;
+                        for (const [id, result] of Object.entries(results.results)) {
+                            if (result.status !== 'passed') {
+                                text += `  - ${id}: ${result.status}\n`;
+                                if (result.details?.failures) {
+                                    text += `    ${result.details.failures.join(', ')}\n`;
+                                }
+                            }
+                        }
+                    }
+                    
+                    text += `\n📊 Details:\n\`\`\`json\n${JSON.stringify(results.results, null, 2)}\n\`\`\``;
+                } else {
+                    text = `Stress test completed\n\`\`\`json\n${JSON.stringify(results, null, 2)}\n\`\`\``;
+                }
+                
+                return { content: [{ type: "text", text }] };
+            } catch (err) {
+                return { 
+                    content: [{ 
+                        type: "text", 
+                        text: `❌ Error: ${err.message}\n\n💡 Make sure tests.json exists in your project root with functional and stress scenarios.` 
+                    }] 
+                };
+            }
+        }
+    );
+
+    // Legacy tools for backward compatibility
     mcp.tool(
         "run_functional_tests",
-        "Run functional tests defined in tests.json. Use configPath to specify a custom tests.json location.",
+        "Run functional tests. Use run_tests instead for better results.",
         { 
-            tag: { type: "string" }, 
             id: { type: "string" },
-            configPath: { type: "string", description: "Path to custom tests.json file" }
+            configPath: { type: "string" }
         },
-        async ({ tag, id, configPath }) => {
-            // Reload config if custom path provided
-            if (configPath) {
-                console.log(`[Testmate] Using custom config: ${configPath}`);
-                service.configLoader.configPath = configPath;
-                service.configLoader.load();
-            }
-            
-            try {
-                await open('http://localhost:3000');
-            } catch (e) { console.error(e); }
-
-            const results = await service.runFunctionalTests(id);
+        async ({ id, configPath }) => {
+            const result = await service.runTests({ type: 'functional', scenarioId: id, configPath });
             return {
                 content: [{
                     type: "text",
-                    text: `Dashboard on http://localhost:3000\n\n${JSON.stringify(results, null, 2)}`
+                    text: JSON.stringify(result, null, 2)
                 }]
             };
         }
@@ -128,28 +206,17 @@ function registerMCPTools(mcp, service) {
 
     mcp.tool(
         "run_stress_simulation",
-        "Run stress simulation. Use configPath to specify a custom tests.json file.",
+        "Run stress test. Use run_tests instead for better results.",
         { 
             scenarioId: { type: "string", required: true },
-            configPath: { type: "string", description: "Path to custom tests.json file" }
+            configPath: { type: "string" }
         },
         async ({ scenarioId, configPath }) => {
-            // Reload config if custom path provided
-            if (configPath) {
-                console.log(`[Testmate] Using custom config: ${configPath}`);
-                service.configLoader.configPath = configPath;
-                service.configLoader.load();
-            }
-            
-            try {
-                await open('http://localhost:3000');
-            } catch (e) { console.error(e); }
-
-            const result = await service.runStressTest(scenarioId);
+            const result = await service.runTests({ type: 'stress', scenarioId, configPath });
             return {
                 content: [{
                     type: "text",
-                    text: `Stress Test started.\n\n${JSON.stringify(result, null, 2)}`
+                    text: JSON.stringify(result, null, 2)
                 }]
             };
         }
@@ -157,16 +224,35 @@ function registerMCPTools(mcp, service) {
 
     mcp.tool(
         "get_test_results",
-        "Get latest test results.",
-        {},
-        async () => {
+        "Get latest test results with full details.",
+        { format: { type: "string", enum: ["json", "summary"] } },
+        async ({ format = "json" }) => {
             const state = service.getState();
+            
+            if (format === "summary") {
+                const functional = Object.values(state.testResults);
+                const stress = Object.values(state.stressResults);
+                const passed = functional.filter(r => r.status === 'passed').length;
+                const failed = functional.filter(r => r.status === 'failed').length;
+                
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Functional: ${passed} passed, ${failed} failed\nStress: ${stress.length} tests run\nConfig: ${state.configPath}`
+                    }]
+                };
+            }
+            
             return {
                 content: [{
                     type: "text",
-                    text: JSON.stringify({ functional: state.testResults, stress: state.stressResults }, null, 2)
+                    text: JSON.stringify({ 
+                        functional: state.testResults, 
+                        stress: state.stressResults,
+                        configPath: state.configPath
+                    }, null, 2)
                 }]
-            }
+            };
         }
     );
     
@@ -178,10 +264,48 @@ function registerMCPTools(mcp, service) {
             service.configLoader.configPath = configPath;
             service.configLoader.load();
             const config = service.getConfig();
+            const error = service.getLastError();
+            
+            if (error) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `❌ ${error}\n\nMake sure the path is correct.`
+                    }]
+                };
+            }
+            
             return {
                 content: [{
                     type: "text",
-                    text: `Config set to: ${configPath}\n\nLoaded ${config?.scenarios?.length || 0} scenarios`
+                    text: `✅ Config loaded from: ${configPath}\n\nFound ${config?.scenarios?.length || 0} test scenarios:\n${config?.scenarios?.map(s => `  - ${s.id} (${s.type})`).join('\n') || '  None'}`
+                }]
+            };
+        }
+    );
+    
+    mcp.tool(
+        "get_config_info",
+        "Get current configuration details and status.",
+        {},
+        async () => {
+            const config = service.getConfig();
+            const configPath = service.getConfigPath();
+            const error = service.getLastError();
+            
+            if (error) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `❌ No config loaded\n\nError: ${error}\n\nExpected config at: ${configPath}\n\nExample tests.json:\n\`\`\`json\n{\n  "config": { "baseUrl": "http://localhost:3000" },\n  "scenarios": [\n    { "id": "test1", "type": "functional", "method": "GET", "endpoint": "/health" }\n  ]\n}\n\`\`\``
+                    }]
+                };
+            }
+            
+            return {
+                content: [{
+                    type: "text",
+                    text: `✅ Config loaded\n📁 Path: ${configPath}\n🌐 Base URL: ${config?.config?.baseUrl}\n⏱️ Timeout: ${config?.config?.timeout}ms\n\nScenarios (${config?.scenarios?.length}):\n${config?.scenarios?.map(s => `  - ${s.id} (${s.type}): ${s.method} ${s.endpoint}`).join('\n')}`
                 }]
             };
         }

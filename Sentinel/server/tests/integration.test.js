@@ -89,8 +89,8 @@ describe('Sentinel Integration Tests', () => {
 
         const results = await service.runFunctionalTests();
 
-        expect(results['get-users'].status).toBe('passed');
-        expect(results['create-user'].status).toBe('passed');
+        expect(results.results['get-users'].status).toBe('passed');
+        expect(results.results['create-user'].status).toBe('passed');
     });
 
     test('should detect test failures correctly', async () => {
@@ -111,8 +111,8 @@ describe('Sentinel Integration Tests', () => {
 
         const results = await service.runFunctionalTests();
 
-        expect(results['error-endpoint'].status).toBe('failed');
-        expect(results['error-endpoint'].details.failures).toContain('Expected status 200, got 500');
+        expect(results.results['error-endpoint'].status).toBe('failed');
+        expect(results.results['error-endpoint'].details.failures).toContain('Expected status 200, got 500');
     });
 
     test('should handle timeout scenarios', async () => {
@@ -134,7 +134,7 @@ describe('Sentinel Integration Tests', () => {
         const results = await service.runFunctionalTests();
 
         // Slow endpoint should still work with 5s timeout
-        expect(results['slow-endpoint']).toBeDefined();
+        expect(results.results['slow-endpoint']).toBeDefined();
     });
 
     test('should maintain state across multiple runs', async () => {
@@ -188,8 +188,8 @@ describe('Sentinel Integration Tests', () => {
 
         const results = await service.runFunctionalTests('only-this');
 
-        expect(results['only-this']).toBeDefined();
-        expect(results['not-this']).toBeUndefined();
+        expect(results.results['only-this']).toBeDefined();
+        expect(results.results['not-this']).toBeUndefined();
     });
 
     test('should emit events during test execution', async () => {

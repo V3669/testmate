@@ -43,10 +43,34 @@ Add to your MCP config (`~/.cursor/mcp.json` or project `.mcp.json`):
 
 | Tool | Parameters | Description |
 |------|------------|-------------|
-| `run_functional_tests` | `id?`, `configPath?` | Run functional tests from tests.json |
-| `run_stress_simulation` | `scenarioId`, `configPath?` | Run stress test on specific scenario |
-| `get_test_results` | none | Get latest test results with metrics |
-| `set_config_path` | `configPath` (required) | Set path to tests.json for current project |
+| `run_tests` | `type?`, `scenarioId?`, `configPath?`, `workingDirectory?` | **Unified** - Run functional, stress, or all tests |
+| `get_test_results` | `format?` | Get latest test results with metrics |
+| `get_config_info` | none | Get current config details and status |
+| `set_config_path` | `configPath` (required) | Set path to tests.json for a project |
+
+### Recommended: Use `run_tests` Tool
+
+The `run_tests` tool is the recommended unified interface:
+
+```javascript
+// Run all functional tests
+run_tests({ type: "functional" })
+
+// Run specific test
+run_tests({ type: "functional", scenarioId: "health_check" })
+
+// Run stress test
+run_tests({ type: "stress", scenarioId: "load_test" })
+
+// Run all tests (functional + stress)
+run_tests({ type: "all" })
+
+// Use custom config path
+run_tests({ type: "functional", configPath: "/path/to/tests.json" })
+
+// Use custom working directory
+run_tests({ type: "functional", workingDirectory: "/path/to/project" })
+```
 
 ### Testing Different Projects
 

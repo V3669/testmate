@@ -99,8 +99,8 @@ describe('Sentinel Integration', () => {
         const results = await service.runFunctionalTests();
 
         expect(results).toBeDefined();
-        expect(results['health-check']).toBeDefined();
-        expect(results['health-check'].status).toBe('passed');
-        expect(results['echo-check'].status).toBe('passed');
+        expect(results.results['health-check']).toBeDefined();
+        expect(results.results['health-check'].status).toBe('passed');
+        expect(results.results['echo-check'].status).toBe('passed');
     });
 });

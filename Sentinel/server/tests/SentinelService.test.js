@@ -128,7 +128,7 @@ describe('SentinelService', () => {
 
         const service2 = new SentinelService('/mock/path');
         
-        await expect(service2.runStressTest('nonexistent')).rejects.toThrow('Stress scenario nonexistent not found');
+        await expect(service2.runStressTest('nonexistent')).rejects.toThrow('Stress scenario "nonexistent" not found');
     });
 
     test('should emit stress_start event', async () => {
