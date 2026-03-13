@@ -43,9 +43,32 @@ Add to your MCP config (`~/.cursor/mcp.json` or project `.mcp.json`):
 
 | Tool | Parameters | Description |
 |------|------------|-------------|
-| `run_functional_tests` | `id?` (optional) | Run functional tests from tests.json |
-| `run_stress_simulation` | `scenarioId` (required) | Run stress test on specific scenario |
+| `run_functional_tests` | `id?`, `configPath?` | Run functional tests from tests.json |
+| `run_stress_simulation` | `scenarioId`, `configPath?` | Run stress test on specific scenario |
 | `get_test_results` | none | Get latest test results with metrics |
+| `set_config_path` | `configPath` (required) | Set path to tests.json for current project |
+
+### Testing Different Projects
+
+Testmate automatically looks for `tests.json` in the IDE's current working directory. You can also specify a custom path:
+
+```json
+{
+  "mcpServers": {
+    "testmate": {
+      "command": "node",
+      "args": ["/path/to/testmate/gateway.js"],
+      "env": {
+        "TESTMATE_CONFIG": "/path/to/project/tests.json"
+      }
+    }
+  }
+}
+```
+
+Or use the MCP tool directly:
+- `set_config_path` with `configPath` parameter to switch projects
+- `run_functional_tests` with `configPath` parameter for one-off tests
 
 ## Configuration File
 
@@ -151,7 +174,7 @@ Use `*` in `bodyPartial` to match any value:
 
 ## Example Usage
 
-### Run all functional tests
+### Run all functional tests (from current project)
 ```
 Use testmate run_functional_tests to verify all endpoints work correctly
 ```
@@ -161,9 +184,19 @@ Use testmate run_functional_tests to verify all endpoints work correctly
 Use testmate run_functional_tests with id="health_check" to test the health endpoint
 ```
 
+### Run tests from a specific project
+```
+Use testmate run_functional_tests with configPath="/Users/vigi/Desktop/myproject/tests.json"
+```
+
 ### Run stress test
 ```
 Use testmate run_stress_simulation with scenarioId="stress_users" to load test the users endpoint
+```
+
+### Set config path for a project
+```
+Use testmate set_config_path with configPath="/Users/vigi/Desktop/lexicon/tests.json" to test the lexicon project
 ```
 
 ### Get results

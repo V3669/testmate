@@ -10,7 +10,7 @@ const open = require('open');
 const SentinelService = require('./SentinelService');
 
 // Exportable Setup Function (Now much cleaner)
-async function setup(mcp, app) {
+async function setup(mcp, app, options = {}) {
     console.log("Setting up Sentinel plugin...");
 
     // 0. Register API endpoints for testing
@@ -21,8 +21,12 @@ async function setup(mcp, app) {
     });
 
     // 1. Initialize Service
-    // tests.json assumed relative to root if not provided
-    const CONFIG_PATH = path.resolve(__dirname, '../../tests.json');
+    // Allow custom config path via options, env var, or default to CWD
+    const CONFIG_PATH = options.configPath || 
+                        process.env.TESTMATE_CONFIG || 
+                        path.resolve(process.cwd(), 'tests.json');
+    
+    console.log(`[Testmate] Using config: ${CONFIG_PATH}`);
     const sentinelService = new SentinelService(CONFIG_PATH);
     sentinelService.start();
 
@@ -94,9 +98,20 @@ async function setup(mcp, app) {
 function registerMCPTools(mcp, service) {
     mcp.tool(
         "run_functional_tests",
-        "Run functional tests defined in tests.json.",
-        { tag: { type: "string" }, id: { type: "string" } },
-        async ({ tag, id }) => {
+        "Run functional tests defined in tests.json. Use configPath to specify a custom tests.json location.",
+        { 
+            tag: { type: "string" }, 
+            id: { type: "string" },
+            configPath: { type: "string", description: "Path to custom tests.json file" }
+        },
+        async ({ tag, id, configPath }) => {
+            // Reload config if custom path provided
+            if (configPath) {
+                console.log(`[Testmate] Using custom config: ${configPath}`);
+                service.configLoader.configPath = configPath;
+                service.configLoader.load();
+            }
+            
             try {
                 await open('http://localhost:3000');
             } catch (e) { console.error(e); }
@@ -113,9 +128,19 @@ function registerMCPTools(mcp, service) {
 
     mcp.tool(
         "run_stress_simulation",
-        "Run stress simulation.",
-        { scenarioId: { type: "string", required: true } },
-        async ({ scenarioId }) => {
+        "Run stress simulation. Use configPath to specify a custom tests.json file.",
+        { 
+            scenarioId: { type: "string", required: true },
+            configPath: { type: "string", description: "Path to custom tests.json file" }
+        },
+        async ({ scenarioId, configPath }) => {
+            // Reload config if custom path provided
+            if (configPath) {
+                console.log(`[Testmate] Using custom config: ${configPath}`);
+                service.configLoader.configPath = configPath;
+                service.configLoader.load();
+            }
+            
             try {
                 await open('http://localhost:3000');
             } catch (e) { console.error(e); }
@@ -132,7 +157,7 @@ function registerMCPTools(mcp, service) {
 
     mcp.tool(
         "get_test_results",
-        "Get latest results.",
+        "Get latest test results.",
         {},
         async () => {
             const state = service.getState();
@@ -142,6 +167,23 @@ function registerMCPTools(mcp, service) {
                     text: JSON.stringify({ functional: state.testResults, stress: state.stressResults }, null, 2)
                 }]
             }
+        }
+    );
+    
+    mcp.tool(
+        "set_config_path",
+        "Set the path to tests.json for testing a different project.",
+        { configPath: { type: "string", required: true } },
+        async ({ configPath }) => {
+            service.configLoader.configPath = configPath;
+            service.configLoader.load();
+            const config = service.getConfig();
+            return {
+                content: [{
+                    type: "text",
+                    text: `Config set to: ${configPath}\n\nLoaded ${config?.scenarios?.length || 0} scenarios`
+                }]
+            };
         }
     );
 }

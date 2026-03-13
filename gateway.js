@@ -24,9 +24,16 @@ async function loadPlugins() {
         console.log("Loading Sentinel plugin...");
         const sentinelPlugin = require('./Sentinel/server/index.js');
 
+        // Support custom config path via env var
+        const options = {};
+        if (process.env.TESTMATE_CONFIG) {
+            options.configPath = process.env.TESTMATE_CONFIG;
+            console.log(`[Testmate] Using config: ${options.configPath}`);
+        }
+
         // Check if plugin exports a setup function
         if (typeof sentinelPlugin.setup === 'function') {
-            await sentinelPlugin.setup(mcpServer, fastify);
+            await sentinelPlugin.setup(mcpServer, fastify, options);
             console.log("Sentinel plugin loaded successfully.");
         } else {
             console.error("Sentinel plugin does not export a setup function.");
