@@ -74,8 +74,9 @@ class SentinelService extends EventEmitter {
             return { error: errorResult };
         }
 
+        // Allow running even if already running - queue or run concurrently
         if (this.isRunning) {
-            return { error: { message: "Tests already running" } };
+            console.log("[Testmate] Tests already running, starting new run anyway...");
         }
         
         this.isRunning = true;

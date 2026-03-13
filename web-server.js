@@ -2,6 +2,9 @@ const fastify = require('fastify')({ logger: true });
 const cors = require('@fastify/cors');
 const path = require('path');
 
+// Get port from environment or default to 3000
+const PORT = process.env.PORT || process.env.TESTMATE_PORT || 3000;
+
 // Initialize Core Systems
 fastify.register(cors, {
     origin: true
@@ -31,8 +34,9 @@ async function start() {
 
     // Start Fastify
     try {
-        await fastify.listen({ port: 3000, host: '0.0.0.0' });
-        console.log('Testmate Web Server listening on port 3000');
+        await fastify.listen({ port: PORT, host: '0.0.0.0' });
+        console.log(`Testmate Web Server listening on port ${PORT}`);
+        console.log(`Testmate UI: http://localhost:${PORT}`);
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);

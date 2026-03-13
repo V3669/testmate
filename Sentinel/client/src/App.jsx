@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Activity, Zap, Server, ChevronRight, Play, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { Activity, Zap, Server, ChevronRight, Play, AlertTriangle, CheckCircle, XCircle, FolderOpen, History } from 'lucide-react'
 import TestList from './components/TestList'
 import TestDetail from './components/TestDetail'
 import StressView from './components/StressView'
@@ -9,10 +9,13 @@ const WS_URL = 'ws://localhost:3000'
 function App() {
   const [status, setStatus] = useState('disconnected')
   const [config, setConfig] = useState(null)
+  const [configPath, setConfigPath] = useState(null)
   const [testResults, setTestResults] = useState({})
   const [stressResults, setStressResults] = useState({})
+  const [testHistory, setTestHistory] = useState([])
   const [selectedScenarioId, setSelectedScenarioId] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [isRunning, setIsRunning] = useState(false)
 
   const ws = useRef(null)
 
@@ -48,22 +51,36 @@ function App() {
         setTestResults(data.testResults || {})
         setStressResults(data.stressResults || {})
         setConfig(data.config || null)
+        setConfigPath(data.configPath || null)
         break
-      case 'config': // If server pushes config
+      case 'config':
         setConfig(data.payload)
         break
       case 'test_result':
         setTestResults(prev => ({ ...prev, [data.payload.id]: data.payload }))
+        addToHistory(data.payload, 'functional')
         break
       case 'stress_result':
         setStressResults(prev => ({ ...prev, [data.payload.id]: data.payload }))
+        addToHistory(data.payload, 'stress')
         break
       case 'status':
-        // status update
+        setIsRunning(data.payload?.isRunning || false)
         break
       default:
         console.log('Unknown message', data)
     }
+  }
+
+  const addToHistory = (result, type) => {
+    setTestHistory(prev => [{
+      id: result.id,
+      type,
+      status: result.status,
+      timestamp: new Date().toISOString(),
+      latency: result.latency || result.metrics?.p50,
+      metrics: result.metrics
+    }, ...prev].slice(0, 50)) // Keep last 50
   }
 
   const handleRunTest = (id) => {
@@ -82,11 +99,49 @@ function App() {
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       {/* Sidebar */}
       <aside className={`w-80 border-r border-border bg-card/50 flex flex-col transition-all duration-300 ${sidebarOpen ? '' : '-ml-80'}`}>
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Activity className="text-primary" /> Sentinel
-          </h1>
-          <div className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-success shadow-[0_0_10px_var(--success)]' : 'bg-error'}`} />
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <Activity className="text-primary" /> Testmate
+            </h1>
+            <div className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-success shadow-[0_0_10px_var(--success)]' : 'bg-error'}`} />
+          </div>
+          
+          {/* Project Info */}
+          {configPath && (
+            <div className="flex items-center gap-1 text-xs text-secondary mb-2">
+              <FolderOpen size={12} />
+              <span className="truncate" title={configPath}>{configPath.split('/').pop()}</span>
+            </div>
+          )}
+          
+          {/* Running Status */}
+          {isRunning && (
+            <div className="flex items-center gap-1 text-xs text-warning mb-2">
+              <Activity size={12} className="animate-spin" />
+              <span>Running tests...</span>
+            </div>
+          )}
+        </div>
+
+        {/* Test History */}
+        <div className="px-4 py-2 border-b border-border">
+          <div className="flex items-center gap-1 text-xs font-semibold text-secondary mb-2">
+            <History size={12} /> Recent Tests
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {testHistory.slice(0, 5).map((test, i) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="truncate max-w-32">{test.id}</span>
+                <span className={test.status === 'passed' ? 'text-success' : 'text-error'}>
+                  {test.status === 'passed' ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                </span>
+              </div>
+            ))}
+            {testHistory.length === 0 && (
+              <span className="text-xs text-secondary">No tests run yet</span>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -112,21 +167,24 @@ function App() {
         <div className="flex-1 p-8 overflow-y-auto">
           {selectedScenarioId ? (
             <div className="max-w-5xl mx-auto space-y-6">
-              {/* Determine type of scenario from results or just show generic detail */}
-              {/* In a real app we'd need the config to know the type, but let's infer or pass it */}
               <TestDetail
                 id={selectedScenarioId}
                 result={testResults[selectedScenarioId]}
-                stressResult={stressResults[selectedScenarioId]} // If applicable
+                stressResult={stressResults[selectedScenarioId]}
                 config={config}
                 onRun={() => handleRunTest(selectedScenarioId)}
-                onStress={() => handleRunStress(selectedScenarioId)} // Assuming we can link them
+                onStress={() => handleRunStress(selectedScenarioId)}
               />
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-secondary">
               <Activity size={64} className="mb-4 opacity-20" />
               <p className="text-xl">Select a scenario to view details</p>
+              {config && (
+                <p className="text-sm mt-2">
+                  {config.scenarios?.length || 0} tests loaded from {configPath?.split('/').pop()}
+                </p>
+              )}
             </div>
           )}
         </div>
