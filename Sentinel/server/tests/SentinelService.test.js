@@ -77,13 +77,14 @@ describe('SentinelService', () => {
         expect(FunctionalRunner.prototype.run).toHaveBeenCalledTimes(1);
     });
 
-    test('should return early if already running', async () => {
+    test('should run tests even if already running (allow concurrent)', async () => {
         const runSpy = jest.spyOn(service, 'runFunctionalTests');
         
         service.isRunning = true;
         await service.runFunctionalTests();
         
-        expect(FunctionalRunner.prototype.run).not.toHaveBeenCalled();
+        // Now allows concurrent runs - so it should be called
+        expect(FunctionalRunner.prototype.run).toHaveBeenCalled();
     });
 
     test('should emit error event when no config loaded', async () => {
