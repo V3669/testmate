@@ -44,10 +44,24 @@ async function setup(mcp, app, options = {}) {
     // 2. Setup WebSocket (Transport Layer)
     const wss = new WebSocket.Server({ server: app.server });
 
+    // Helper to read shared history
+    const getSharedHistory = () => {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const os = require('os');
+            const historyPath = path.join(os.homedir(), '.testmate', 'history.json');
+            if (fs.existsSync(historyPath)) {
+                return JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+            }
+        } catch (e) {}
+        return [];
+    };
+
     wss.on('connection', (ws) => {
-        // Send initial state including history
+        // Send initial state including shared history
         const state = sentinelService.getState();
-        const history = sentinelService.getRecentHistory(20);
+        const history = getSharedHistory(); // Read from shared file
         ws.send(JSON.stringify({
             type: 'init',
             ...state,
@@ -62,6 +76,11 @@ async function setup(mcp, app, options = {}) {
                 }
                 if (data.type === 'run_stress') {
                     await sentinelService.runStressTest(data.id);
+                }
+                if (data.type === 'refresh_history') {
+                    // Send updated history
+                    const history = getSharedHistory();
+                    ws.send(JSON.stringify({ type: 'history_update', history }));
                 }
             } catch (e) {
                 console.error("WS Handler Error:", e);
