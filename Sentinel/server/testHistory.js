@@ -1,9 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 class TestHistory {
     constructor(storagePath = null) {
-        this.storagePath = storagePath || path.join(process.cwd(), '.testmate-history.json');
+        // Store in user's home directory, not in project
+        const homeDir = os.homedir();
+        const testmateDir = path.join(homeDir, '.testmate');
+        this.storagePath = storagePath || path.join(testmateDir, 'history.json');
         this.history = [];
         this.load();
     }
