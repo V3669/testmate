@@ -1,11 +1,11 @@
 ---
 name: testmate
 description: |
-  Testmate is an AI-powered testing framework that runs functional and stress tests against local APIs. 
-  Use when user wants to: generate tests, run API tests, load test endpoints, check API performance metrics, 
-  test against localhost APIs, verify API responses, or measure p50/p95/p99 latency.
-  Works with tests.json config file in the project.
-  Trigger keywords: test, API, endpoint, load, stress, performance, latency, p95, health check, integration test
+  Run functional and stress tests against any API endpoint. 
+  Use for: API testing, endpoint validation, load testing, performance metrics, 
+  p50/p95/p99 latency checks, health checks, integration testing.
+  Triggers: test API, run tests, load test, stress test, check endpoint, 
+  verify response, measure latency, performance test, health check
 ---
 
 # Testmate - AI-Powered API Testing
@@ -15,10 +15,7 @@ Testmate enables AI agents to run functional and stress tests against local APIs
 ## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Start the server
 npm start
 ```
 
@@ -39,73 +36,72 @@ Add to your MCP config (`~/.cursor/mcp.json` or project `.mcp.json`):
 }
 ```
 
-## Available MCP Tools
+## Available Tools
 
-| Tool | Parameters | Description |
-|------|------------|-------------|
-| `run_tests` | `type?`, `scenarioId?`, `configPath?`, `workingDirectory?` | **Unified** - Run functional, stress, or all tests |
-| `get_test_results` | `format?` | Get latest test results with metrics |
-| `get_config_info` | none | Get current config details and status |
-| `set_config_path` | `configPath` (required) | Set path to tests.json for a project |
+### run_tests (Recommended)
 
-### Recommended: Use `run_tests` Tool
+Primary tool for running tests. Parameters:
 
-The `run_tests` tool is the recommended unified interface:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `type` | string | No | "functional", "stress", or "all" |
+| `scenarioId` | string | No | Specific test ID to run |
+| `workingDirectory` | string | No | Path to your project |
+| `configPath` | string | No | Full path to tests.json |
+
+### Other Tools
+
+- `get_config_info` - Show current config and status
+- `get_test_results` - Get latest test results
+- `set_config_path` - Switch to different project
+
+## Usage Examples
+
+### Basic Usage
 
 ```javascript
 // Run all functional tests
 run_tests({ type: "functional" })
 
-// Run specific test
-run_tests({ type: "functional", scenarioId: "health_check" })
-
 // Run stress test
 run_tests({ type: "stress", scenarioId: "load_test" })
 
-// Run all tests (functional + stress)
-run_tests({ type: "all" })
-
-// Use custom config path
-run_tests({ type: "functional", configPath: "/path/to/tests.json" })
-
-// Use custom working directory
-run_tests({ type: "functional", workingDirectory: "/path/to/project" })
+// Run specific test
+run_tests({ scenarioId: "health_check" })
 ```
 
-### Testing Different Projects
+### Testing Your Project
 
-Testmate automatically looks for `tests.json` in the IDE's current working directory. You can also specify a custom path:
+```javascript
+// Use workingDirectory to specify your project
+run_tests({ 
+  type: "functional", 
+  workingDirectory: "/Users/vigi/Desktop/lexicon" 
+})
 
-```json
-{
-  "mcpServers": {
-    "testmate": {
-      "command": "node",
-      "args": ["/path/to/testmate/gateway.js"],
-      "env": {
-        "TESTMATE_CONFIG": "/path/to/project/tests.json"
-      }
-    }
-  }
-}
+// Or use configPath for specific file
+run_tests({ 
+  configPath: "/Users/vigi/Desktop/lexicon/tests.json" 
+})
+
+// Run stress test on your project
+run_tests({ 
+  type: "stress", 
+  scenarioId: "webinar_stress",
+  workingDirectory: "/Users/vigi/Desktop/lexicon" 
+})
 ```
-
-Or use the MCP tool directly:
-- `set_config_path` with `configPath` parameter to switch projects
-- `run_functional_tests` with `configPath` parameter for one-off tests
 
 ## Configuration File
 
-Create `tests.json` in your project root:
+Create `tests.json` in your project:
 
 ```json
 {
   "config": {
-    "baseUrl": "http://localhost:8080",
-    "globalHeaders": {
-      "Authorization": "Bearer {{env.API_KEY}}"
-    },
-    "timeout": 5000
+    "baseUrl": "http://localhost:6001",
+    "globalHeaders": { "Authorization": "Bearer {{env.API_KEY}}" },
+    "timeout": 15000
   },
   "scenarios": [
     {
@@ -113,145 +109,95 @@ Create `tests.json` in your project root:
       "type": "functional",
       "method": "GET",
       "endpoint": "/health",
-      "expect": {
-        "status": 200,
-        "bodyPartial": { "status": "ok" }
-      }
+      "expect": { "status": 200 }
     },
     {
       "id": "create_user",
-      "type": "functional",
+      "type": "functional", 
       "method": "POST",
       "endpoint": "/users",
-      "body": { "name": "Test", "role": "admin" },
-      "expect": {
-        "status": 201,
-        "bodyPartial": { "id": "*", "name": "Test" }
-      }
+      "body": { "name": "Test" },
+      "expect": { "status": 201, "bodyPartial": { "id": "*" } }
     },
     {
-      "id": "stress_users",
+      "id": "load_test",
       "type": "stress",
       "targetScenarioId": "create_user",
-      "parameters": {
-        "connections": 50,
-        "duration": "10s",
-        "pipelining": 1
-      },
-      "thresholds": {
-        "p95": 200,
-        "errors": 0.01
-      }
+      "parameters": { "connections": 10, "duration": "10s" },
+      "thresholds": { "p95": 500, "errors": 0.01 }
     }
   ]
 }
 ```
 
-## Environment Variables
+## Wildcard Matching
 
-Use `{{env.VAR_NAME}}` syntax:
+Use `*` in bodyPartial to match any value:
+
+```json
+{ "bodyPartial": { "id": "*", "name": "Test" } }
+```
+
+## Environment Variables
 
 ```json
 {
   "config": {
-    "baseUrl": "{{env.API_URL}}",
-    "globalHeaders": {
-      "Authorization": "Bearer {{env.API_KEY}}"
-    }
+    "baseUrl": "{{env.API_URL}}"
   },
   "env": {
-    "API_URL": "http://localhost:3000",
-    "API_KEY": "your-token"
+    "API_URL": "http://localhost:3000"
   }
 }
 ```
 
-## Wildcard Matching
+## Test Types
 
-Use `*` in `bodyPartial` to match any value:
+### Functional Tests
+- Test API logic and responses
+- Assert status codes and body content
+- Support wildcards for dynamic values
 
-```json
-{
-  "expect": {
-    "bodyPartial": {
-      "id": "*",
-      "name": "Test"
-    }
-  }
-}
+### Stress Tests  
+- Load test with concurrent connections
+- Measure p50, p95, p99 latency
+- Track RPS (requests per second)
+- Verify error rates under load
+
+## Example Prompts
+
+```
+"Run tests against our API at localhost:6001"
+"Load test the /users endpoint with 50 connections"
+"Verify the health endpoint returns 200"
+"Check if the webhook endpoint responds correctly"
+"Run our full test suite"
+"Test the login API with invalid credentials"
 ```
 
-## Stress Test Parameters
+## Troubleshooting
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `connections` | Number of concurrent users | 10 |
-| `duration` | Test duration (e.g., "10s", "1m") | 10 |
-| `pipelining` | Number of pipelined requests | 1 |
+If tests don't run against your project:
 
-## Threshold Options
+```javascript
+// Explicitly specify working directory
+run_tests({ 
+  workingDirectory: "/full/path/to/your/project" 
+})
 
-| Threshold | Description | Failure Condition |
-|-----------|-------------|------------------|
-| `p95` | 95th percentile latency (ms) | > threshold |
-| `errors` | Error rate (0-1) | > threshold |
-
-## Example Usage
-
-### Run all functional tests (from current project)
+// Check current config
+get_config_info()
 ```
-Use testmate run_functional_tests to verify all endpoints work correctly
-```
-
-### Run specific test
-```
-Use testmate run_functional_tests with id="health_check" to test the health endpoint
-```
-
-### Run tests from a specific project
-```
-Use testmate run_functional_tests with configPath="/Users/vigi/Desktop/myproject/tests.json"
-```
-
-### Run stress test
-```
-Use testmate run_stress_simulation with scenarioId="stress_users" to load test the users endpoint
-```
-
-### Set config path for a project
-```
-Use testmate set_config_path with configPath="/Users/vigi/Desktop/lexicon/tests.json" to test the lexicon project
-```
-
-### Get results
-```
-Use testmate get_test_results to retrieve the latest test metrics
-```
-
-## Viewing Results
-
-- **Web UI**: Open http://localhost:3000
-- **Real-time**: WebSocket updates show test progress
-- **Metrics**: p50, p95, p99 latency, RPS, error rates
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm start` | Start web server |
-| `npm run mcp` | Start MCP gateway |
-| `npm test` | Run tests |
-| `npm run build` | Build client |
 
 ## Project Structure
 
 ```
 testmate/
-├── gateway.js           # MCP server
-├── web-server.js        # HTTP server
-├── tests.json           # Test config
-├── Sentinel/
-│   ├── client/          # React UI
-│   └── server/          # Test engine
-└── SKILL.md             # This file
+├── gateway.js        # MCP server
+├── web-server.js     # HTTP server  
+├── tests.json        # Default config
+├── SKILL.md          # This file
+└── Sentinel/
+    ├── client/       # UI
+    └── server/       # Engine
 ```
