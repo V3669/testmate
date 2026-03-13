@@ -47,6 +47,7 @@ function App() {
       case 'init':
         setTestResults(data.testResults || {})
         setStressResults(data.stressResults || {})
+        setConfig(data.config || null)
         break
       case 'config': // If server pushes config
         setConfig(data.payload)

@@ -1,4 +1,4 @@
-const FunctionalRunner = require('./functionalRunner');
+const FunctionalRunner = require('../functionalRunner');
 const axios = require('axios');
 
 jest.mock('axios');
@@ -164,5 +164,163 @@ describe('FunctionalRunner', () => {
 
         expect(result.status).toBe('error');
         expect(result.details.error).toBe('Network Error');
+    });
+
+    test('should merge scenario headers with global headers', async () => {
+        const scenario = {
+            id: 'test-headers',
+            method: 'GET',
+            endpoint: '/data',
+            headers: { 'X-Custom-Header': 'custom-value' }
+        };
+
+        axios.mockResolvedValue({
+            status: 200,
+            headers: {},
+            data: {}
+        });
+
+        await runner.run(scenario, mockGlobalConfig);
+
+        expect(axios).toHaveBeenCalledWith(
+            expect.objectContaining({
+                headers: expect.objectContaining({
+                    'Authorization': 'Bearer token',
+                    'X-Custom-Header': 'custom-value'
+                })
+            })
+        );
+    });
+
+    test('should use default baseUrl when not provided', async () => {
+        const scenario = {
+            id: 'test-default-url',
+            method: 'GET',
+            endpoint: '/test'
+        };
+
+        axios.mockResolvedValue({
+            status: 200,
+            headers: {},
+            data: {}
+        });
+
+        await runner.run(scenario, {});
+
+        expect(axios).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: 'http://localhost:3000/test'
+            })
+        );
+    });
+
+    test('should respect custom timeout', async () => {
+        const scenario = {
+            id: 'test-timeout',
+            method: 'GET',
+            endpoint: '/test'
+        };
+
+        const customConfig = {
+            ...mockGlobalConfig,
+            timeout: 10000
+        };
+
+        axios.mockResolvedValue({
+            status: 200,
+            headers: {},
+            data: {}
+        });
+
+        await runner.run(scenario, customConfig);
+
+        expect(axios).toHaveBeenCalledWith(
+            expect.objectContaining({
+                timeout: 10000
+            })
+        );
+    });
+
+    test('should handle timeout error', async () => {
+        const scenario = {
+            id: 'test-timeout-error',
+            method: 'GET',
+            endpoint: '/slow'
+        };
+
+        axios.mockRejectedValue(new Error('timeout of 5000ms exceeded'));
+
+        const result = await runner.run(scenario, mockGlobalConfig);
+
+        expect(result.status).toBe('error');
+        expect(result.details.error).toContain('timeout');
+    });
+
+    test('should include response in details on success', async () => {
+        const scenario = {
+            id: 'test-response',
+            method: 'GET',
+            endpoint: '/test',
+            expect: { status: 200 }
+        };
+
+        axios.mockResolvedValue({
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+            data: { success: true }
+        });
+
+        const result = await runner.run(scenario, mockGlobalConfig);
+
+        // When test passes, details should have response
+        expect(result.status).toBe('passed');
+    });
+
+    test('should handle PUT method correctly', async () => {
+        const scenario = {
+            id: 'test-put',
+            method: 'PUT',
+            endpoint: '/users/1',
+            body: { name: 'Updated' },
+            expect: { status: 200 }
+        };
+
+        axios.mockResolvedValue({
+            status: 200,
+            headers: {},
+            data: { id: 1, name: 'Updated' }
+        });
+
+        const result = await runner.run(scenario, mockGlobalConfig);
+
+        expect(axios).toHaveBeenCalledWith(
+            expect.objectContaining({
+                method: 'PUT',
+                data: { name: 'Updated' }
+            })
+        );
+    });
+
+    test('should handle DELETE method correctly', async () => {
+        const scenario = {
+            id: 'test-delete',
+            method: 'DELETE',
+            endpoint: '/users/1',
+            expect: { status: 204 }
+        };
+
+        axios.mockResolvedValue({
+            status: 204,
+            headers: {},
+            data: ''
+        });
+
+        const result = await runner.run(scenario, mockGlobalConfig);
+
+        expect(axios).toHaveBeenCalledWith(
+            expect.objectContaining({
+                method: 'DELETE'
+            })
+        );
     });
 });

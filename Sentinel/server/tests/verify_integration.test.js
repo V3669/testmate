@@ -1,4 +1,4 @@
-const SentinelService = require('./SentinelService');
+const SentinelService = require('../SentinelService');
 const fastify = require('fastify');
 const path = require('path');
 const fs = require('fs');

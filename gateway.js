@@ -1,8 +1,12 @@
-const fastify = require('fastify')({ logger: true });
+const fastify = require('fastify')({ logger: false });
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const cors = require('@fastify/cors');
 const path = require('path');
+
+// IMPORTANT: MCP stdio uses stdout for the protocol. Writing logs to stdout can break the handshake.
+// Route logs to stderr in this process.
+console.log = console.error;
 
 // Initialize Core Systems
 const mcpServer = new McpServer({
@@ -36,19 +40,15 @@ async function loadPlugins() {
 async function start() {
     await loadPlugins();
 
-    // Start Fastify
+    // Start MCP only (web server is handled separately)
     try {
-        await fastify.listen({ port: 3000, host: '0.0.0.0' });
-        console.log('Testmate Gateway listening on port 3000');
+        const transport = new StdioServerTransport();
+        await mcpServer.connect(transport);
+        console.log("Testmate MCP Gateway connected via Stdio");
     } catch (err) {
-        fastify.log.error(err);
+        console.error("Failed to connect MCP transport:", err);
         process.exit(1);
     }
-
-    // Start MCP
-    const transport = new StdioServerTransport();
-    await mcpServer.connect(transport);
-    console.log("Testmate MCP Gateway connected via Stdio");
 }
 
 start();

@@ -13,6 +13,13 @@ const SentinelService = require('./SentinelService');
 async function setup(mcp, app) {
     console.log("Setting up Sentinel plugin...");
 
+    // 0. Register API endpoints for testing
+    app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+    app.post('/users', async (request) => {
+        const id = Math.floor(Math.random() * 1000);
+        return { id, ...request.body, createdAt: new Date().toISOString() };
+    });
+
     // 1. Initialize Service
     // tests.json assumed relative to root if not provided
     const CONFIG_PATH = path.resolve(__dirname, '../../tests.json');
@@ -77,7 +84,9 @@ async function setup(mcp, app) {
     }
 
     // 5. Register MCP Tools
-    registerMCPTools(mcp, sentinelService);
+    if (mcp) {
+        registerMCPTools(mcp, sentinelService);
+    }
 
     console.log("Sentinel plugin setup complete.");
 }

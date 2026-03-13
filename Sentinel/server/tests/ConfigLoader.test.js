@@ -1,4 +1,4 @@
-const ConfigLoader = require('./configLoader');
+const ConfigLoader = require('../configLoader');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -75,5 +75,42 @@ describe('ConfigLoader', () => {
 
         const lastCall = updateSpy.mock.calls[updateSpy.mock.calls.length - 1];
         expect(lastCall[0]).toEqual({ version: 2 });
+    });
+
+    test('should handle empty config file gracefully', () => {
+        const emptyFile = path.join(tempDir, `sentinel-empty-${Date.now()}.json`);
+        fs.writeFileSync(emptyFile, '');
+
+        loader = new ConfigLoader(emptyFile);
+        loader.load();
+
+        expect(loader.getConfig()).toBeNull();
+
+        fs.unlinkSync(emptyFile);
+    });
+
+    test('should handle watcher cleanup properly', () => {
+        loader = new ConfigLoader(tempConfigFile);
+        loader.startWatching();
+        
+        // Should not throw when closing
+        expect(() => loader.watcher.close()).not.toThrow();
+    });
+
+    test('should notify multiple listeners', () => {
+        fs.writeFileSync(tempConfigFile, JSON.stringify({ test: true }));
+        loader = new ConfigLoader(tempConfigFile);
+        loader.load();
+        
+        const spy1 = jest.fn();
+        const spy2 = jest.fn();
+        
+        loader.onUpdate(spy1);
+        loader.onUpdate(spy2);
+        
+        loader.notifyListeners({ test: true });
+        
+        expect(spy1).toHaveBeenCalledWith({ test: true });
+        expect(spy2).toHaveBeenCalledWith({ test: true });
     });
 });

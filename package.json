@@ -5,7 +5,8 @@
   "main": "gateway.js",
   "scripts": {
     "test": "cd Sentinel/server && npm test",
-    "start": "node gateway.js",
+    "start": "node web-server.js",
+    "mcp": "node gateway.js",
     "build": "cd Sentinel/client && npm run build",
     "dev": "concurrently \"npm start\" \"cd Sentinel/client && npm run dev\""
   },
@@ -15,6 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "@fastify/cors": "^11.2.0",
+    "@fastify/static": "^9.0.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "concurrently": "^9.2.1",
     "fastify": "^5.7.4",
