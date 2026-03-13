@@ -2,12 +2,12 @@ name: Testmate CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
 
     strategy:
@@ -15,38 +15,38 @@ jobs:
         node-version: [18.x, 20.x]
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-    - name: Install Root Dependencies
-      run: npm ci
+      - name: Install Root Dependencies
+        run: npm install
 
-    - name: Install Client Dependencies
-      run: |
-        cd Sentinel/client
-        npm ci
+      - name: Install Server Dependencies
+        run: cd Sentinel/server && npm install
 
-    - name: Verify Gateway Starts
-      run: |
-        # Start gateway in background
-        node gateway.js &
-        PID=$!
-        sleep 5
-        # Check if process is still running
-        if ps -p $PID > /dev/null; then
-          echo "Gateway started successfully"
-          kill $PID
-        else
-          echo "Gateway failed to start"
-          exit 1
-        fi
+      - name: Install Client Dependencies
+        run: cd Sentinel/client && npm install
 
-    - name: Build Client
-      run: |
-        cd Sentinel/client
-        npm run build
+      - name: Run Server Tests
+        run: cd Sentinel/server && npm test
+
+      - name: Build Client
+        run: cd Sentinel/client && npm run build
+
+      - name: Verify Server Starts
+        run: |
+          node web-server.js &
+          PID=$!
+          sleep 5
+          if ps -p $PID > /dev/null; then
+            echo "Server started successfully"
+            kill $PID
+          else
+            echo "Server failed to start"
+            exit 1
+          fi
