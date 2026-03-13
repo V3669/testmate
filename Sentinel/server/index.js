@@ -21,13 +21,24 @@ async function setup(mcp, app, options = {}) {
     });
 
     // 1. Initialize Service
-    // Allow custom config path via options, env var, or default to CWD
-    const CONFIG_PATH = options.configPath || 
-                        process.env.TESTMATE_CONFIG || 
-                        path.resolve(process.cwd(), 'tests.json');
+    // Priority: 1. configPath param, 2. CWD/tests.json, 3. env var, 4. default
+    let configPath = options.configPath || process.env.TESTMATE_CONFIG;
     
-    console.log(`[Testmate] Using config: ${CONFIG_PATH}`);
-    const sentinelService = new SentinelService(CONFIG_PATH);
+    if (!configPath) {
+        // Try current working directory first (where IDE is running)
+        const cwdConfig = path.resolve(process.cwd(), 'tests.json');
+        const fs = require('fs');
+        if (fs.existsSync(cwdConfig)) {
+            configPath = cwdConfig;
+            console.log(`[Testmate] Found tests.json in current working directory: ${cwdConfig}`);
+        } else {
+            // Fall back to default in testmate installation
+            configPath = path.resolve(__dirname, '../../tests.json');
+        }
+    }
+    
+    console.log(`[Testmate] Using config: ${configPath}`);
+    const sentinelService = new SentinelService(configPath);
     sentinelService.start();
 
     // 2. Setup WebSocket (Transport Layer)
@@ -100,7 +111,7 @@ function registerMCPTools(mcp, service) {
     mcp.tool(
         "run_tests",
         `Run functional or stress tests from tests.json.
-         - Auto-discovers tests.json in current working directory
+         - Auto-discovers tests.json in current working directory (where IDE is running)
          - Returns rich results with summary and recommendations
          - Use type='functional' for API tests, type='stress' for load tests`,
         { 
@@ -115,21 +126,35 @@ function registerMCPTools(mcp, service) {
             },
             configPath: { 
                 type: "string", 
-                description: "Path to custom tests.json file (optional, defaults to CWD/tests.json)" 
+                description: "Path to custom tests.json file" 
             },
             workingDirectory: {
                 type: "string",
-                description: "Working directory to run tests from (optional)"
+                description: "Working directory to run tests from (defaults to current working directory)"
             }
         },
         async ({ type = "functional", scenarioId, configPath, workingDirectory }) => {
             try {
-                // Update config path if provided
-                if (configPath) {
-                    service.configLoader.configPath = configPath;
-                    service.configLoader.load();
-                } else if (workingDirectory) {
-                    service.configLoader.configPath = path.resolve(workingDirectory, 'tests.json');
+                // Determine config path - priority: explicit > workingDirectory > CWD
+                const fs = require('fs');
+                let finalPath = configPath;
+                
+                if (!finalPath && workingDirectory) {
+                    finalPath = path.resolve(workingDirectory, 'tests.json');
+                }
+                
+                if (!finalPath) {
+                    // Try current working directory first
+                    finalPath = path.resolve(process.cwd(), 'tests.json');
+                    if (!fs.existsSync(finalPath)) {
+                        // Try the original config path from service
+                        finalPath = service.getConfigPath();
+                    }
+                }
+                
+                if (finalPath && fs.existsSync(finalPath) && finalPath !== service.getConfigPath()) {
+                    console.log(`[Testmate] Loading config from: ${finalPath}`);
+                    service.configLoader.configPath = finalPath;
                     service.configLoader.load();
                 }
                 
