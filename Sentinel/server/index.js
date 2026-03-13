@@ -45,11 +45,13 @@ async function setup(mcp, app, options = {}) {
     const wss = new WebSocket.Server({ server: app.server });
 
     wss.on('connection', (ws) => {
-        // Send initial state
+        // Send initial state including history
         const state = sentinelService.getState();
+        const history = sentinelService.getRecentHistory(20);
         ws.send(JSON.stringify({
             type: 'init',
-            ...state
+            ...state,
+            history
         }));
 
         ws.on('message', async (message) => {
@@ -413,6 +415,41 @@ function registerMCPTools(mcp, service) {
                           `⏱️ Timeout: ${config?.config?.timeout}ms\n\n` +
                           `Scenarios (${config?.scenarios?.length}):\n` +
                           `${config?.scenarios?.map(s => `  - ${s.id} (${s.type}): ${s.method} ${s.endpoint}`).join('\n')}`
+                }]
+            };
+        }
+    );
+
+    mcp.tool(
+        "get_history",
+        "Get test run history with results from all projects.",
+        { limit: { type: "number", default: 20 } },
+        async ({ limit }) => {
+            const history = service.getRecentHistory(limit);
+            
+            // Group by project
+            const byProject = {};
+            history.forEach(h => {
+                if (!byProject[h.project]) byProject[h.project] = [];
+                byProject[h.project].push(h);
+            });
+            
+            let text = `📊 Test History (${history.length} recent)\n\n`;
+            
+            for (const [project, tests] of Object.entries(byProject)) {
+                text += `🏠 ${project}:\n`;
+                tests.forEach(t => {
+                    const emoji = t.status === 'passed' ? '✅' : t.status === 'failed' ? '❌' : '⚠️';
+                    const time = new Date(t.timestamp).toLocaleTimeString();
+                    text += `  ${emoji} ${t.id} - ${time}\n`;
+                });
+                text += '\n';
+            }
+            
+            return {
+                content: [{
+                    type: "text",
+                    text
                 }]
             };
         }

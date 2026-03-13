@@ -3,6 +3,7 @@ const ConfigLoader = require('./configLoader');
 const FunctionalRunner = require('./functionalRunner');
 const StressRunner = require('./stressRunner');
 const VariableInterpolator = require('./utils/VariableInterpolator');
+const TestHistory = require('./testHistory');
 
 class SentinelService extends EventEmitter {
     constructor(configPath) {
@@ -10,6 +11,7 @@ class SentinelService extends EventEmitter {
         this.configLoader = new ConfigLoader(configPath);
         this.functionalRunner = new FunctionalRunner();
         this.stressRunner = new StressRunner();
+        this.testHistory = new TestHistory();
 
         // Encapsulated State
         this.testResults = {};
@@ -22,6 +24,14 @@ class SentinelService extends EventEmitter {
 
     start() {
         this.configLoader.startWatching();
+    }
+
+    getHistory() {
+        return this.testHistory.getAll();
+    }
+
+    getRecentHistory(limit = 10) {
+        return this.testHistory.getRecent(limit);
     }
 
     getConfig() {
@@ -105,6 +115,7 @@ class SentinelService extends EventEmitter {
         const results = {};
         let passed = 0;
         let failed = 0;
+        const configPath = this.getConfigPath();
 
         for (const scenario of toRun) {
             this.emit('test_start', { id: scenario.id });
@@ -114,10 +125,14 @@ class SentinelService extends EventEmitter {
                 this.testResults[scenario.id] = result;
                 if (result.status === 'passed') passed++;
                 else failed++;
+                
+                // Save to history
+                this.testHistory.add(result, 'functional', configPath);
                 this.emit('test_result', result);
             } catch (err) {
                 const errorResult = { id: scenario.id, status: 'error', error: err.message };
                 results[scenario.id] = errorResult;
+                this.testHistory.add(errorResult, 'functional', configPath);
                 this.emit('error', `Scenario ${scenario.id} failed: ${err.message}`);
                 failed++;
             }
@@ -169,9 +184,15 @@ class SentinelService extends EventEmitter {
         try {
             const result = await this.stressRunner.run(stressScenario, functionalScenario, interpolatedConfig.config);
             this.stressResults[stressScenarioId] = result;
+            
+            // Save to history
+            this.testHistory.add({ ...result, scenarioId: stressScenarioId }, 'stress', this.getConfigPath());
+            
             this.emit('stress_result', result);
             return result;
         } catch (err) {
+            const errorResult = { scenarioId: stressScenarioId, status: 'error', error: err.message };
+            this.testHistory.add(errorResult, 'stress', this.getConfigPath());
             this.emit('error', `Stress test failed: ${err.message}`);
             throw err;
         }

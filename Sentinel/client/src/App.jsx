@@ -52,17 +52,28 @@ function App() {
         setStressResults(data.stressResults || {})
         setConfig(data.config || null)
         setConfigPath(data.configPath || null)
+        setTestHistory(data.history || [])
         break
       case 'config':
         setConfig(data.payload)
         break
       case 'test_result':
         setTestResults(prev => ({ ...prev, [data.payload.id]: data.payload }))
-        addToHistory(data.payload, 'functional')
+        // Add to history
+        setTestHistory(prev => [{
+          ...data.payload,
+          type: 'functional',
+          timestamp: new Date().toISOString()
+        }, ...prev].slice(0, 50))
         break
       case 'stress_result':
         setStressResults(prev => ({ ...prev, [data.payload.id]: data.payload }))
-        addToHistory(data.payload, 'stress')
+        // Add to history
+        setTestHistory(prev => [{
+          ...data.payload,
+          type: 'stress',
+          timestamp: new Date().toISOString()
+        }, ...prev].slice(0, 50))
         break
       case 'status':
         setIsRunning(data.payload?.isRunning || false)
@@ -70,17 +81,6 @@ function App() {
       default:
         console.log('Unknown message', data)
     }
-  }
-
-  const addToHistory = (result, type) => {
-    setTestHistory(prev => [{
-      id: result.id,
-      type,
-      status: result.status,
-      timestamp: new Date().toISOString(),
-      latency: result.latency || result.metrics?.p50,
-      metrics: result.metrics
-    }, ...prev].slice(0, 50)) // Keep last 50
   }
 
   const handleRunTest = (id) => {
